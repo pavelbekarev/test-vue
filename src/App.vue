@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import img1 from "../public/assets/img1.jpg"
+import { computed, ref } from "vue";
 
 const startX = ref<number | null>();
 const startY = ref<number | null>();
@@ -9,15 +8,38 @@ const endY = ref<number | null>()
 
 const loadedImage = ref<any>();
 
-document.addEventListener("mousedown", (e: MouseEvent) => {
-    startX.value = e.clientX;
-    startY.value = e.clientY
-})
+const selection = ref();
 
-document.addEventListener("mouseup", (e: MouseEvent) => {
-    endX.value = e.clientX;
-    endY.value = e.clientY 
-})
+const isSelection = ref<boolean>(false);
+
+const mouseDownEvent = (e: MouseEvent) => {
+    isSelection.value = true;
+    startX.value = e.offsetX;
+    startY.value = e.offsetY
+
+    selection.value.style.left = startX.value.toString() + 'px';
+    selection.value.style.top = startY.value.toString() + 'px';
+    selection.value.style.width = '0px';
+    selection.value.style.height = '0px';
+    selection.value.style.display = 'block'
+}
+
+const mouseMoveEvent = (e: MouseEvent) => {
+    if (!isSelection.value) return;
+
+    endX.value = e.offsetX;
+    endY.value = e.offsetY;
+
+    selection.value.style.width = Math.abs(width.value) + 'px';
+    selection.value.style.height = Math.abs(height.value) + 'px';
+
+    selection.value.style.left = (width.value < 0 ? endX.value : startX.value) + "px";
+    selection.value.style.top = (height.value < 0 ? endY.value : startY.value) + "px";
+}
+
+const mouseUpEvent = (e: MouseEvent) => {
+    isSelection.value = false
+}
 
 const width = computed(() => {
     return endX.value - startX.value
@@ -27,53 +49,88 @@ const height = computed(() => {
     return endY.value - startY.value
 })
 
-function drawArea() {
-    var canvas = document.getElementById("targetArea");
-    const ctx = canvas.getContext("2d")
+const loadImage = (e: Event) => {
+    if (!e.target.files || e.target.files.length === 0) return;
 
-    ctx.strokeRect(startX.value, startY.value, width, height)
-}
-
-watch([() => width.value, () => height.value], (value) => {
-    if (value[0] && value[1]) {
-        console.debug(value[0], value[1])
-        drawArea();
+    const reader = new FileReader();
+    reader.onload = () => {
+        loadedImage.value = reader.result;
     }
-})
 
-const loadImage = (e) => {
-    loadedImage.value = e.target.files[0]['name']
+    reader.readAsDataURL(e.target.files[0])
 }
+
+
+
+const countCoords = () => {
+    const resultStartX = computed(() => {
+        return startX.value;
+    })
+
+    const resultStartY = computed(() => {
+        return startY.value;
+    })
+
+    const resultEndX = computed(() => {
+        return startX.value + width.value;
+    })
+
+    const resultEndY = computed(() => {
+        return startX.value + height.value;
+    })
+
+    return {
+        resultStartX, resultStartY, resultEndX, resultEndY
+    }
+}
+
+const {resultEndX, resultEndY, resultStartX, resultStartY} = countCoords();
 </script>
 
 <template>
     <input type="file" @change="loadImage">
-    <img class="img" :src="loadedImage" alt="image">
+    
+    <div ref="targetArea" class="targetArea" @mousedown="mouseDownEvent" @mousemove="mouseMoveEvent" @mouseup="mouseUpEvent">
+        <img class="img" :src="loadedImage" alt="image">
+        <div ref="selection" class="selection" v-if="isSelection"></div>
+    </div>
 
-    <canvas v-show="width && height" class="targetArea" id="targetArea" :width="width" :height="height"></canvas>
-    <span>{{ width }}</span>
+    <span class="result">{{ resultStartX }}</span>
+    <span class="result">{{ resultStartY }}</span>
+    <span class="result">{{ resultEndX }}</span>
+    <span class="result">{{ resultEndY }}</span>
 </template>
 
 <style scoped>
-*, *::before, *::after {
-    box-sizing: border-box;
-    padding: 0;
-    margin: 0;
-}
-
 .targetArea {
+    position: relative;
+    width: 700px;
+    height: 700px;
+}
+
+.selection {
     position: absolute;
-    background-color: red;
+    border: 2px dashed blue;
+    background: rgba(0, 0, 255, 0.2);
+    pointer-events: none;
+}
+.img {
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+
 }
 
-.img { 
-    pointer-events: none;
-    width: 100px;
-    height: 100px;
+.result {
+    display: flex;
+    flex-flow: column;
+    position: relative;
+    right: 0;
+    bottom: 10%;
 }
 
-.imageWrapper {
-    pointer-events: none;
-    background-image: url();
+.result:nth-child(1n) {
+    margin-top: 25px;
 }
 </style>
